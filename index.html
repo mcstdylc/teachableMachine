@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bird vs Fish Classifier</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+            transition: all 0.5s ease;
+        }
+        
+        .half {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: all 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .fish-side {
+            background: linear-gradient(135deg, #1a6bb0, #4ab3f4);
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .bird-side {
+            background: linear-gradient(135deg, #f9a825, #fbc02d);
+            color: #5d4037;
+            text-shadow: 1px 1px 3px rgba(255,255,255,0.3);
+        }
+        
+        .title {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            z-index: 2;
+        }
+        
+        .upload-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            text-align: center;
+            background: rgba(255,255,255,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .upload-container:hover {
+            transform: translate(-50%, -50%) scale(1.02);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+        }
+        
+        .upload-title {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .upload-btn {
+            background: #6200ea;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .upload-btn:hover {
+            background: #7c4dff;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        #uploaded-image {
+            max-width: 80%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            object-fit: cover;
+            transition: all 0.5s ease;
+            display: none;
+            margin: 20px 0;
+            border: 3px solid white;
+        }
+        
+        #label-container {
+            font-size: 1.5rem;
+            margin: 20px 0;
+            min-height: 60px;
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+            width: 80%;
+        }
+        
+        #dial-wrapper {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+        
+        #dial {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: conic-gradient(#4caf50 0% 50%, #f44336 50% 100%);
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.3);
+            border: 5px solid white;
+        }
+        
+        #pointer {
+            width: 6px;
+            height: 100px;
+            background: #333;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%) rotate(90deg);
+            transition: transform 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 3px;
+        }
+        
+        .water-effect {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.2)" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+            background-size: cover;
+            background-repeat: repeat-x;
+            animation: wave 15s linear infinite;
+        }
+        
+        .bird-decoration {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><path fill="rgba(255,255,255,0.3)" d="M50,10C30,10,20,30,20,50s10,40,30,40s30-20,30-40S70,10,50,10z M35,35c0-5,5-5,5-5s5,0,5,5s-5,5-5,5S35,40,35,35z M65,35c0-5,5-5,5-5s5,0,5,5s-5,5-5,5S65,40,65,35z"></path></svg>');
+            background-repeat: space;
+            opacity: 0.3;
+            animation: float 30s linear infinite;
+        }
+        
+        @keyframes wave {
+            0% { background-position-x: 0; }
+            100% { background-position-x: 1440px; }
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0) translateX(0); }
+            25% { transform: translateY(-20px) translateX(20px); }
+            50% { transform: translateY(0) translateX(40px); }
+            75% { transform: translateY(-20px) translateX(20px); }
+            100% { transform: translateY(0) translateX(0); }
+        }
+        
+        .result-animation {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .hidden {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        .visible {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.5s ease;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-name {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Fish Themed Side -->
+        <div class="half fish-side">
+            <div class="water-effect"></div>
+            <h1 class="title">Underwater World 🐠</h1>
+            <img id="uploaded-image-fish" class="hidden" alt="Uploaded Fish Image">
+            <div id="label-container-fish" class="hidden">Upload an image to see if it's a fish!</div>
+        </div>
+
+        <!-- Bird Themed Side -->
+        <div class="half bird-side">
+            <div class="bird-decoration"></div>
+            <h1 class="title">Sky Kingdom 🦅</h1>
+            <img id="uploaded-image-bird" class="hidden" alt="Uploaded Bird Image">
+            <div id="label-container-bird" class="hidden">Upload an image to see if it's a bird!</div>
+        </div>
+
+        <!-- Upload Button in Center -->
+        <div class="upload-container">
+            <h2 class="upload-title">Bird or Fish Classifier</h2>
+            <label for="image-upload" class="upload-btn">Choose Image</label>
+            <input id="image-upload" type="file" accept="image/*">
+            <div class="file-name" id="file-name"></div>
+        </div>
+
+        <!-- Dial in the Center -->
+        <div id="dial-wrapper">
+            <div id="dial"><div id="pointer"></div></div>
+        </div>
+    </div>
+
+    <script>
+        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZMDniAaq9/";
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            const fileInput = document.getElementById("image-upload");
+            const fileNameDisplay = document.getElementById("file-name");
+            const fishImage = document.getElementById("uploaded-image-fish");
+            const birdImage = document.getElementById("uploaded-image-bird");
+            const fishLabel = document.getElementById("label-container-fish");
+            const birdLabel = document.getElementById("label-container-bird");
+            const container = document.querySelector(".container");
+            
+            let model;
+            
+            try {
+                fishLabel.textContent = "Loading model...";
+                birdLabel.textContent = "Loading model...";
+                
+                model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+                
+                fishLabel.textContent = "Ready! Upload an image.";
+                birdLabel.textContent = "Ready! Upload an image.";
+                
+                fileInput.addEventListener('change', handleImageUpload);
+            } catch (error) {
+                console.error("Error loading model:", error);
+                fishLabel.textContent = "Error loading model";
+                birdLabel.textContent = "Error loading model";
+            }
+            
+            async function handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                fileNameDisplay.textContent = `Selected: ${file.name}`;
+                
+                try {
+                    const objectUrl = URL.createObjectURL(file);
+                    
+                    // Reset display
+                    fishImage.classList.add("hidden");
+                    birdImage.classList.add("hidden");
+                    fishLabel.classList.add("hidden");
+                    birdLabel.classList.add("hidden");
+                    
+                    // Show loading state
+                    fishLabel.textContent = "Analyzing...";
+                    birdLabel.textContent = "Analyzing...";
+                    fishLabel.classList.remove("hidden");
+                    birdLabel.classList.remove("hidden");
+                    
+                    // Create temporary image for prediction
+                    const tempImg = new Image();
+                    tempImg.src = objectUrl;
+                    
+                    tempImg.onload = async () => {
+                        try {
+                            const prediction = await model.predict(tempImg);
+                            displayResults(prediction, objectUrl);
+                            URL.revokeObjectURL(objectUrl);
+                        } catch (error) {
+                            console.error("Classification error:", error);
+                            showError();
+                        }
+                    };
+                } catch (error) {
+                    console.error("Error handling image upload:", error);
+                    showError();
+                }
+            }
+            
+            function displayResults(prediction, imageUrl) {
+                let fishProb = 0;
+                let birdProb = 0;
+                
+                prediction.forEach(p => {
+                    if (p.className.toLowerCase().includes("fish")) fishProb = p.probability;
+                    if (p.className.toLowerCase().includes("bird")) birdProb = p.probability;
+                });
+                
+                // Update dial
+                const angle = 90 - (birdProb * 180);
+                document.getElementById("pointer").style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+                
+                // Determine which side to show the image on
+                const isFish = fishProb > birdProb;
+                
+                if (isFish) {
+                    fishImage.src = imageUrl;
+                    fishImage.classList.remove("hidden");
+                    fishImage.classList.add("result-animation");
+                    fishLabel.textContent = `Fish detected! (${(fishProb * 100).toFixed(1)}% confidence)`;
+                    fishLabel.classList.remove("hidden");
+                    
+                    // Highlight fish side
+                    container.style.transform = "translateX(-10px)";
+                    document.querySelector(".fish-side").style.flex = "1.2";
+                    document.querySelector(".bird-side").style.flex = "0.8";
+                } else {
+                    birdImage.src = imageUrl;
+                    birdImage.classList.remove("hidden");
+                    birdImage.classList.add("result-animation");
+                    birdLabel.textContent = `Bird detected! (${(birdProb * 100).toFixed(1)}% confidence)`;
+                    birdLabel.classList.remove("hidden");
+                    
+                    // Highlight bird side
+                    container.style.transform = "translateX(10px)";
+                    document.querySelector(".bird-side").style.flex = "1.2";
+                    document.querySelector(".fish-side").style.flex = "0.8";
+                }
+                
+                // Add visible class after a delay for animation
+                setTimeout(() => {
+                    if (isFish) {
+                        fishImage.classList.add("visible");
+                        fishLabel.classList.add("visible");
+                    } else {
+                        birdImage.classList.add("visible");
+                        birdLabel.classList.add("visible");
+                    }
+                }, 100);
+            }
+            
+            function showError() {
+                fishLabel.textContent = "Error classifying image";
+                birdLabel.textContent = "Error classifying image";
+                fishLabel.classList.remove("hidden");
+                birdLabel.classList.remove("hidden");
+            }
+        });
+    </script>
+</body>
+</html>
